@@ -1,0 +1,1 @@
+Currently the GPS has a vary slow sampaling rate (1hz and on those samples only the magnetometer reports not accel, gyro, temp or pressure.
