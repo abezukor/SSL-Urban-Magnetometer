@@ -8,7 +8,10 @@
 #ifdef dobogusinclude
 #include <spi4teensy3.h>
 #endif
+
 #include <SPI.h>
+//#include <SD.h>
+
 //https://github.com/felis/USB_Host_Shield_2.0.git
 class ACMAsyncOper : public CDCAsyncOper{
 public:
@@ -40,25 +43,87 @@ uint8_t ACMAsyncOper::OnInit(ACM *pacm){
 	return rcode;
 }
 
+//Set up USB
+const int USBChipSelect = 10;
 USB     Usb;
 //USBHub     Hub(&Usb);
 ACMAsyncOper  AsyncOper;
 ACM           Acm(&Usb, &AsyncOper);
 
-void setup()
-{
-  Serial.begin(115200);
-  Serial.println("Start");
+//set Up SD Card
+/*
+const int SDChipSelect = 4;
+const int maxLog = 10000;
+volatile int logged = 0;*/
 
-  if (Usb.Init() == -1)
-	  Serial.println("OSCOKIRQ failed to assert");
+//Set Up timers
+const uint16_t t1_load = 0;
+const uint16_t t1_comp = 12500;
 
-  delay( 200 );
+volatile String latestOutput;
+
+void setup(){
+	//Set up Serial
+	Serial.begin(115200);
+	Serial.println("Start");
+
+	//Set up SPI
+	pinMode(USBChipSelect, OUTPUT); // Sets USB CS pin output
+	pinMode(SDChipSelect, OUTPUT); //Sets SD CS pin output
+	digitalWrite(SDChipSelect,HIGH);
+	digitalWrite(USBChipSelect,HIGH);
+
+	//Set up USB
+	USBActive();
+
+	if (Usb.Init() == -1){
+    Serial.println("OSCOKIRQ failed to assert");
+  }
+  
+	//set up timers
+	TCCR1A = 0;//Resets register from arduino initialazation
+	TCCR1B |= (1<<CS12);
+	TCCR1B &= (1<<CS10);
+
+	
+
+	delay(500);
+
 }
 
 void loop(){
-  Serial.println(readACM());
-  delay(50);
+	String toWrite = "Error";
+
+	
+	toWrite = readACM();
+	Serial.print(toWrite);
+	delay(100);
+	//Serial.println("LoopCycle");
+
+	/*
+	if(logged>=maxLog){
+		logged = 0;
+		name++;
+	}*/
+	/*
+	SD.begin(SDChipSelect);
+	File dataFile = SD.open(String(name), FILE_WRITE);
+	if(dataFile){
+		dataFile.println(toWrite);
+		dataFile.close();
+	}*/
+}
+
+//Activates USB and Deactivates SD
+void USBActive(){
+	digitalWrite(SDChipSelect,HIGH);
+	digitalWrite(USBChipSelect,LOW);
+}
+
+//Activates SD and Deactiavates USB
+void SDActive(){
+	digitalWrite(USBChipSelect,true);
+	digitalWrite(SDChipSelect,false);
 }
 
 String readACM(){
@@ -85,5 +150,23 @@ String readACM(){
 			return String(rcvdData);
 		}
 	}
-	return String("ACM Not Ready");
+	return String("");
+}
+
+bool sndData(byte data[]){
+	Usb.Task();
+
+	if(Acm.isReady()){
+		uint8_t rcode;
+
+		rcode = Acm.SndData(1, data);
+		if (rcode){
+			ErrorMessage<uint8_t>(PSTR("SndData"), rcode);
+			return false;
+		}
+		return true;
+	}else{
+		Serial.print("ACM Not Ready");
+		return false;
+	}
 }
