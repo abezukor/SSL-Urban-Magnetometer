@@ -58,9 +58,12 @@ volatile int logged = 0;*/
 
 //Set Up timers
 const uint16_t t1_load = 0;
-const uint16_t t1_comp = 12500;
+const uint16_t t1_comp = 6250;
+volatile bool newData = false;
 
-volatile String latestOutput;
+//set up data array
+float latestData[11];
+unsigned short spaces[13] = {3,6,0,0,0,0,0,0,0,0,0,0,0};
 
 void setup(){
 	//Set up Serial
@@ -68,52 +71,66 @@ void setup(){
 	Serial.println("Start");
 
 	//Set up SPI
+	/*
 	pinMode(USBChipSelect, OUTPUT); // Sets USB CS pin output
 	pinMode(SDChipSelect, OUTPUT); //Sets SD CS pin output
 	digitalWrite(SDChipSelect,HIGH);
-	digitalWrite(USBChipSelect,HIGH);
+	digitalWrite(USBChipSelect,HIGH);*/
 
 	//Set up USB
-	USBActive();
+	//USBActive();
 
 	if (Usb.Init() == -1){
-    Serial.println("OSCOKIRQ failed to assert");
-  }
-  
+	Serial.println("OSCOKIRQ failed to assert");
+	}
+	delay(500);
+
 	//set up timers
 	TCCR1A = 0;//Resets register from arduino initialazation
-	TCCR1B |= (1<<CS12);
-	TCCR1B &= (1<<CS10);
+	TCCR1B |= (1<<CS12); // Sets prescaler to (1,0,0)
+	TCCR1B &= ~(1<<CS11);
+	TCCR1B &= ~(1<<CS10);
 
-	
+	TCNT1 = t1_load;//Set Timer to 0
+	OCR1A = t1_comp;//Set compare register
 
-	delay(500);
+	TIMSK1 = (1 << OCIE1A); // Enable Timer Interrupt
+	sei();//enable global interrupts 
 
 }
 
 void loop(){
-	String toWrite = "Error";
-
 	
-	toWrite = readACM();
-	Serial.print(toWrite);
-	delay(100);
-	//Serial.println("LoopCycle");
-
-	/*
-	if(logged>=maxLog){
-		logged = 0;
-		name++;
-	}*/
-	/*
-	SD.begin(SDChipSelect);
-	File dataFile = SD.open(String(name), FILE_WRITE);
-	if(dataFile){
-		dataFile.println(toWrite);
-		dataFile.close();
-	}*/
+	if(newData){
+		Serial.print(readACM());
+		newData = false;
+		//Serial.print(String(latestOutput));
+		/*
+		if(logged>=maxLog){
+			logged = 0;
+			name++;
+		}*/
+		/*
+		SD.begin(SDChipSelect);
+		File dataFile = SD.open(String(name), FILE_WRITE);
+		if(dataFile){
+			dataFile.println(toWrite);
+			dataFile.close();1
+		}*/
+		//newData = false;
+	};
 }
 
+//Interrupt
+ISR(TIMER1_COMPA_vect){
+	TCNT1= t1_load;
+	//Serial.print("Interrupt");
+	//latestOutput = 
+	//readACM();
+	newData = true;
+
+}
+/*
 //Activates USB and Deactivates SD
 void USBActive(){
 	digitalWrite(SDChipSelect,HIGH);
@@ -125,8 +142,9 @@ void SDActive(){
 	digitalWrite(USBChipSelect,true);
 	digitalWrite(SDChipSelect,false);
 }
+*/
 
-String readACM(){
+bool readACM(){
   Usb.Task();
 
   if( Acm.isReady()) {
@@ -143,14 +161,16 @@ String readACM(){
 			ErrorMessage<uint8_t>(PSTR("Ret"), rcode);
 
 		if( rcvd ) { //more than zero bytes received
-			char rcvdData[rcvd];
-			for(uint16_t i=0; i < rcvd; i++ ) {
-				rcvdData[i] = (char)buf[i]; //printing on the screen
+			//VMR
+			if(rcvd>30){
+
+			}else if{ // GPS
+				 return false
 			}
-			return String(rcvdData);
+			
 		}
 	}
-	return String("");
+	return false;
 }
 
 bool sndData(byte data[]){
