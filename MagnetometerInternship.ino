@@ -58,12 +58,9 @@ volatile int logged = 0;*/
 
 //Set Up timers
 const uint16_t t1_load = 0;
-const uint16_t t1_comp = 6250;
+const uint16_t t1_comp = 3900;// 16000000*(1/sample_rate)*0.5/ 256
 volatile bool newData = false;
 
-//set up data array
-float latestData[11];
-unsigned short spaces[13] = {3,6,0,0,0,0,0,0,0,0,0,0,0};
 
 void setup(){
 	//Set up Serial
@@ -103,6 +100,7 @@ void loop(){
 	
 	if(newData){
 		Serial.print(readACM());
+		Serial.println(": Log :");
 		newData = false;
 		//Serial.print(String(latestOutput));
 		/*
@@ -144,33 +142,30 @@ void SDActive(){
 }
 */
 
-bool readACM(){
+String readACM(){
   Usb.Task();
 
   if( Acm.isReady()) {
 	   uint8_t rcode;
 
-		/* reading the phone */
 		/* buffer size must be greater or equal to max.packet size */
 		/* it it set to 64 (largest possible max.packet size) here, can be tuned down
 		for particular endpoint */
-		uint8_t  buf[64];
-		uint16_t rcvd = 64;
+		uint8_t buf[127];
+		uint16_t rcvd = 127;
 		rcode = Acm.RcvData(&rcvd, buf);
 		 if (rcode && rcode != hrNAK)
 			ErrorMessage<uint8_t>(PSTR("Ret"), rcode);
 
 		if( rcvd ) { //more than zero bytes received
-			//VMR
-			if(rcvd>30){
-
-			}else if{ // GPS
-				 return false
+			char rcvdData[rcvd];
+			for(uint16_t i=0; i < rcvd; i++ ) {
+				rcvdData[i] = (char)buf[i]; //printing on the screen
 			}
-			
+			return String(rcvdData);
 		}
 	}
-	return false;
+	return "SomeError \n";
 }
 
 bool sndData(byte data[]){
