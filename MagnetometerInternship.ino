@@ -10,7 +10,7 @@
 #endif
 
 #include <SPI.h>
-//#include <SD.h>
+#include <SD.h>
 
 //https://github.com/felis/USB_Host_Shield_2.0.git
 class ACMAsyncOper : public CDCAsyncOper{
@@ -51,15 +51,17 @@ ACMAsyncOper  AsyncOper;
 ACM           Acm(&Usb, &AsyncOper);
 
 //set Up SD Card
-/*
 const int SDChipSelect = 4;
-const int maxLog = 10000;
-volatile int logged = 0;*/
+const long maxLog = 100000;
+volatile long logged = 0;
+unsigned long name = 0;
+File dataFile;
+String newData;
 
 //Set Up timers
 const uint16_t t1_load = 0;
-const uint16_t t1_comp = 3900;// 16000000*(1/sample_rate)*0.5/ 256
-volatile bool newData = false;
+const uint16_t t1_comp = 15624;
+volatile bool isNewData = false;
 
 
 void setup(){
@@ -68,14 +70,18 @@ void setup(){
 	Serial.println("Start");
 
 	//Set up SPI
-	/*
 	pinMode(USBChipSelect, OUTPUT); // Sets USB CS pin output
 	pinMode(SDChipSelect, OUTPUT); //Sets SD CS pin output
 	digitalWrite(SDChipSelect,HIGH);
-	digitalWrite(USBChipSelect,HIGH);*/
+	digitalWrite(USBChipSelect,HIGH);
+
+	//Set Up SD
+	SDActive();
+	SD.begin(SDChipSelect);
+	dataFile = SD.open(String(name)+".txt", FILE_WRITE);
 
 	//Set up USB
-	//USBActive();
+	USBActive();
 
 	if (Usb.Init() == -1){
 	Serial.println("OSCOKIRQ failed to assert");
@@ -83,40 +89,43 @@ void setup(){
 	delay(500);
 
 	//set up timers
-	TCCR1A = 0;//Resets register from arduino initialazation
-	TCCR1B |= (1<<CS12); // Sets prescaler to (1,0,0)
-	TCCR1B &= ~(1<<CS11);
-	TCCR1B &= ~(1<<CS10);
 
-	TCNT1 = t1_load;//Set Timer to 0
-	OCR1A = t1_comp;//Set compare register
+	noInterrupts();
+	// Clear registers
+	TCCR1A = 0;
+	TCCR1B = 0;
+	TCNT1 = 0;
 
-	TIMSK1 = (1 << OCIE1A); // Enable Timer Interrupt
-	sei();//enable global interrupts 
+	// 16 Hz (16000000/((15624+1)*64))
+	OCR1A = t1_comp;
+	// CTC
+	TCCR1B |= (1 << WGM12);
+	// Prescaler 64
+	TCCR1B |= (1 << CS11) | (1 << CS10);
+	// Output Compare Match A Interrupt Enable
+	TIMSK1 |= (1 << OCIE1A);
+	interrupts();
 
 }
 
 void loop(){
 	
-	if(newData){
+	if(isNewData){
+		newData = readACM();
 		Serial.print(readACM());
-		Serial.println(": Log :");
-		newData = false;
-		//Serial.print(String(latestOutput));
-		/*
-		if(logged>=maxLog){
-			logged = 0;
-			name++;
-		}*/
-		/*
-		SD.begin(SDChipSelect);
-		File dataFile = SD.open(String(name), FILE_WRITE);
+		SDActive();
 		if(dataFile){
-			dataFile.println(toWrite);
-			dataFile.close();1
-		}*/
-		//newData = false;
-	};
+			dataFile.print(newData);
+		}
+		if(logged == maxLog){
+			logged = 0;
+			dataFile.close();
+			name++;
+			dataFile = SD.open(String(name)+".txt", FILE_WRITE);
+		}
+		USBActive();
+		isNewData = false;
+	}
 }
 
 //Interrupt
@@ -125,10 +134,10 @@ ISR(TIMER1_COMPA_vect){
 	//Serial.print("Interrupt");
 	//latestOutput = 
 	//readACM();
-	newData = true;
-
+	isNewData = true;
+	logged++;
 }
-/*
+
 //Activates USB and Deactivates SD
 void USBActive(){
 	digitalWrite(SDChipSelect,HIGH);
@@ -140,7 +149,6 @@ void SDActive(){
 	digitalWrite(USBChipSelect,true);
 	digitalWrite(SDChipSelect,false);
 }
-*/
 
 String readACM(){
   Usb.Task();
@@ -162,8 +170,11 @@ String readACM(){
 			for(uint16_t i=0; i < rcvd; i++ ) {
 				rcvdData[i] = (char)buf[i]; //printing on the screen
 			}
+
+			memset(buf,0,rcvd);
 			return String(rcvdData);
 		}
+		return "";
 	}
 	return "SomeError \n";
 }
