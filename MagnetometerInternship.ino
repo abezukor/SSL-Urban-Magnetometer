@@ -49,14 +49,15 @@ USB     Usb;
 //USBHub     Hub(&Usb);
 ACMAsyncOper  AsyncOper;
 ACM           Acm(&Usb, &AsyncOper);
+volatile char rcvdData[127];
+char nonVolatileData[127];
 
 //set Up SD Card
 const int SDChipSelect = 4;
-const long maxLog = 100000;
+const long maxLog = 500;
 volatile long logged = 0;
 unsigned long name = 0;
 File dataFile;
-String newData;
 
 //Set Up timers
 const uint16_t t1_load = 0;
@@ -78,7 +79,7 @@ void setup(){
 	//Set Up SD
 	SDActive();
 	SD.begin(SDChipSelect);
-	dataFile = SD.open(String(name)+".txt", FILE_WRITE);
+	dataFile = SD.open(String(name), FILE_WRITE);
 
 	//Set up USB
 	USBActive();
@@ -111,20 +112,31 @@ void setup(){
 void loop(){
 	
 	if(isNewData){
-		newData = readACM();
-		Serial.print(readACM());
-		SDActive();
+		for(int i = 0; i<127; i++){
+			nonVolatileData[i] = rcvdData[i];
+		}
+		Serial.print(logged);Serial.println(name);
 		if(dataFile){
-			dataFile.print(newData);
+			SDActive();
+			dataFile.print(nonVolatileData);
 		}
-		if(logged == maxLog){
-			logged = 0;
-			dataFile.close();
-			name++;
-			dataFile = SD.open(String(name)+".txt", FILE_WRITE);
-		}
-		USBActive();
+		memset(nonVolatileData,(char)0,127);
+		memset(rcvdData,(char)0,127);
 		isNewData = false;
+	}
+
+	if(logged >= maxLog){
+		noInterrupts();
+		//Serial.println("Changing name");
+		logged = 0;
+		SDActive();
+		//Serial.println("Closing File");
+		dataFile.close();
+		name++;
+		SDActive();
+		//Serial.println("Opening New File ");
+		dataFile = SD.open(String(name), FILE_WRITE);
+		interrupts();
 	}
 }
 
@@ -134,7 +146,7 @@ ISR(TIMER1_COMPA_vect){
 	//Serial.print("Interrupt");
 	//latestOutput = 
 	//readACM();
-	isNewData = true;
+	isNewData = readACM();
 	logged++;
 }
 
@@ -150,11 +162,12 @@ void SDActive(){
 	digitalWrite(SDChipSelect,false);
 }
 
-String readACM(){
-  Usb.Task();
+bool readACM(){
+	USBActive();
+	Usb.Task();
 
-  if( Acm.isReady()) {
-	   uint8_t rcode;
+	if( Acm.isReady()) {
+		uint8_t rcode;
 
 		/* buffer size must be greater or equal to max.packet size */
 		/* it it set to 64 (largest possible max.packet size) here, can be tuned down
@@ -162,21 +175,21 @@ String readACM(){
 		uint8_t buf[127];
 		uint16_t rcvd = 127;
 		rcode = Acm.RcvData(&rcvd, buf);
-		 if (rcode && rcode != hrNAK)
+			if (rcode && rcode != hrNAK)
 			ErrorMessage<uint8_t>(PSTR("Ret"), rcode);
 
 		if( rcvd ) { //more than zero bytes received
-			char rcvdData[rcvd];
 			for(uint16_t i=0; i < rcvd; i++ ) {
 				rcvdData[i] = (char)buf[i]; //printing on the screen
 			}
 
 			memset(buf,0,rcvd);
-			return String(rcvdData);
+			SDActive();
+			return true;
 		}
-		return "";
+		return false;
 	}
-	return "SomeError \n";
+	return false;
 }
 
 bool sndData(byte data[]){
