@@ -54,7 +54,7 @@ char nonVolatileData[127];
 
 //set Up SD Card
 const int SDChipSelect = 4;
-const long maxLog = 500;
+const long maxLog = 75000;
 volatile long logged = 0;
 unsigned long name = 0;
 File dataFile;
@@ -67,8 +67,8 @@ volatile bool isNewData = false;
 
 void setup(){
 	//Set up Serial
-	Serial.begin(115200);
-	Serial.println("Start");
+	//Serial.begin(115200);
+	//Serial.println("Start");
 
 	//Set up SPI
 	pinMode(USBChipSelect, OUTPUT); // Sets USB CS pin output
@@ -85,7 +85,7 @@ void setup(){
 	USBActive();
 
 	if (Usb.Init() == -1){
-	Serial.println("OSCOKIRQ failed to assert");
+	//Serial.println("OSCOKIRQ failed to assert");
 	}
 	delay(500);
 
@@ -115,7 +115,7 @@ void loop(){
 		for(int i = 0; i<127; i++){
 			nonVolatileData[i] = rcvdData[i];
 		}
-		Serial.print(logged);Serial.println(name);
+		//Serial.print(logged);Serial.println(name);
 		if(dataFile){
 			SDActive();
 			dataFile.print(nonVolatileData);
@@ -205,7 +205,7 @@ bool sndData(byte data[]){
 		}
 		return true;
 	}else{
-		Serial.print("ACM Not Ready");
+		//Serial.print("ACM Not Ready");
 		return false;
 	}
 }
