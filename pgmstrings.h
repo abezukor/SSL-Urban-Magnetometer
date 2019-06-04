@@ -1,9 +1,10 @@
+/*Directly from https://github.com/felis/USB_Host_Shield_2.0/blob/master/examples/acm/acm_terminal/pgmstrings.h */
 #if !defined(__PGMSTRINGS_H__)
 #define __PGMSTRINGS_H__
 
 #define LOBYTE(x) ((char*)(&(x)))[0]
 #define HIBYTE(x) ((char*)(&(x)))[1]
-#define BUFSIZE 256    //buffer size
+#define BUFSIZE 256    //buffer sizehttps://github.com/felis/USB_Host_Shield_2.0/blob/master/examples/acm/acm_terminal/pgmstrings.h
  
 
 /* Print strings in Program Memory */

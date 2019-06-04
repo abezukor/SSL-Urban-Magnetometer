@@ -1,6 +1,6 @@
 #How to run: source("DataGathered/plots.R")
 #Take in data
-inData <- read.csv(file="DataGathered/NightData.csv",row.names=NULL)
+inData <- read.csv(file="DataGathered/weekendData.csv",row.names=NULL)
 #Remove nan lines. Should not be nessassary
 inData <- inData[complete.cases(inData), ]
 #Make a plot with X Vect

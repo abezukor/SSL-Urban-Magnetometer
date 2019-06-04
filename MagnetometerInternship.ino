@@ -12,7 +12,6 @@
 #include <SPI.h>
 #include <SD.h>
 
-//https://github.com/felis/USB_Host_Shield_2.0.git
 class ACMAsyncOper : public CDCAsyncOper{
 public:
 	uint8_t OnInit(ACM *pacm);
@@ -54,7 +53,7 @@ char nonVolatileData[127];
 
 //set Up SD Card
 const int SDChipSelect = 4;
-const long maxLog = 75000;
+const long maxLog = 75000;//75000 is about 1.4mb files
 volatile long logged = 0;
 unsigned long name = 0;
 File dataFile;
@@ -79,6 +78,10 @@ void setup(){
 	//Set Up SD
 	SDActive();
 	SD.begin(SDChipSelect);
+	File rootDir = SD.open("/");
+	name = getNumFiles(rootDir)+1;
+	rootDir.close();
+	Serial.println(name);
 	dataFile = SD.open(String(name), FILE_WRITE);
 
 	//Set up USB
@@ -175,8 +178,10 @@ bool readACM(){
 		uint8_t buf[127];
 		uint16_t rcvd = 127;
 		rcode = Acm.RcvData(&rcvd, buf);
-			if (rcode && rcode != hrNAK)
+		
+		if (rcode && rcode != hrNAK){
 			ErrorMessage<uint8_t>(PSTR("Ret"), rcode);
+		}
 
 		if( rcvd ) { //more than zero bytes received
 			for(uint16_t i=0; i < rcvd; i++ ) {
@@ -208,4 +213,21 @@ bool sndData(byte data[]){
 		//Serial.print("ACM Not Ready");
 		return false;
 	}
+}
+
+//Gets the number of Files already on the SD Card.
+long getNumFiles(File dir){
+	long i = 0;
+	while(true){
+		File entry = dir.openNextFile();
+		if(entry){
+			i++;
+			entry.close();
+		}
+		else{
+			entry.close();
+			break;
+		}
+	}
+	return i;
 }
